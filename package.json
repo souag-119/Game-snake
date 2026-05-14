@@ -1,7 +1,7 @@
 {
-  "name": "gem-hunt",
+  "name": "bone-brawl",
   "version": "1.0.0",
-  "description": "Multiplayer gem collecting game",
+  "description": "Multiplayer physics brawler with skeleton characters",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
