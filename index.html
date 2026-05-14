@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Gem Hunt - لعبة الجواهر</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #0a0a1a;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: flex;
+      align-items: center; justify-content: center;
+      background: rgba(10, 10, 26, 0.9);
+      z-index: 10;
+      transition: opacity 0.3s;
+    }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+    #joinBox {
+      background: #1a1a3e;
+      border: 2px solid #4ECDC4;
+      border-radius: 20px;
+      padding: 30px 25px;
+      text-align: center;
+      max-width: 350px;
+      width: 90%;
+      box-shadow: 0 0 40px rgba(78, 205, 196, 0.3);
+    }
+    #joinBox h1 {
+      color: #FFEAA7;
+      font-size: 2em;
+      margin-bottom: 5px;
+      letter-spacing: 2px;
+    }
+    #joinBox .emoji { font-size: 2.5em; display: block; }
+    #joinBox p { color: #aaa; margin-bottom: 20px; font-size: 0.9em; }
+    #joinBox input {
+      width: 100%;
+      padding: 12px 15px;
+      border-radius: 30px;
+      border: 2px solid #4ECDC4;
+      background: #0a0a1a;
+      color: #fff;
+      font-size: 1.1em;
+      text-align: center;
+      outline: none;
+      margin-bottom: 15px;
+      transition: border-color 0.3s;
+    }
+    #joinBox input:focus { border-color: #FFEAA7; }
+    #joinBox button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 30px;
+      border: none;
+      background: linear-gradient(135deg, #4ECDC4, #45B7D1);
+      color: #0a0a1a;
+      font-size: 1.2em;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    #joinBox button:active { transform: scale(0.95); }
+    #joinBox button:hover { box-shadow: 0 0 25px rgba(78, 205, 196, 0.5); }
+    #playerCount { color: #4ECDC4; margin-top: 10px; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+
+  <!-- شاشة الانضمام -->
+  <div id="overlay">
+    <div id="joinBox">
+      <span class="emoji">💎</span>
+      <h1>Gem Hunt</h1>
+      <p>لعبة جماعية - اجمع الجواهر!</p>
+      <input type="text" id="nameInput" placeholder="أدخل اسمك..." maxlength="15" autocomplete="off">
+      <button id="joinBtn">🎮 انضم للعبة</button>
+      <div id="playerCount">🟢 اللاعبون المتصلون: 0</div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <script>
+    // ==================== عناصر الصفحة ====================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const nameInput = document.getElementById('nameInput');
+    const joinBtn = document.getElementById('joinBtn');
+    const playerCountEl = document.getElementById('playerCount');
+
+    // ==================== متغيرات اللعبة ====================
+    let socket;
+    let myPlayer = null;
+    let gamePlayers = {};
+    let gameGems = [];
+    let worldW = 2000, worldH = 2000;
+    let playerRadius = 25, gemRadius = 12;
+    let joystickActive = false;
+    let joystickBase = { x: 0, y: 0 };
+    let joystickThumb = { x: 0, y: 0 };
+    let joystickTouchId = null;
+    let dirX = 0, dirY = 0;
+    let keys = {};
+    let playerName = '';
+    let targetDirX = 0, targetDirY = 0;
+
+    // ==================== تغيير حجم الشاشة ====================
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      // تحديث موقع قاعدة عصا التحكم
+      joystickBase.x = canvas.width * 0.18;
+      joystickBase.y = canvas.height * 0.75;
+      joystickThumb.x = joystickBase.x;
+      joystickThumb.y = joystickBase.y;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ==================== الاتصال بالسيرفر ====================
+    function connectToServer() {
+      socket = io();
+
+      socket.on('connect', () => {
+        console.log('✅ متصل بالسيرفر');
+        if (playerName) {
+          socket.emit('setName', playerName);
+        }
+      });
+
+      socket.on('playerInfo', (info) => {
+        myPlayer = {
+          id: info.id,
+          color: info.color,
+          x: 0, y: 0,
+          score: 0,
+        };
+        worldW = info.worldWidth;
+        worldH = info.worldHeight;
+        playerRadius = info.playerRadius;
+        gemRadius = info.gemRadius;
+        overlay.classList.add('hidden');
+        console.log('🎮 معلوماتي:', myPlayer);
+      });
+
+      socket.on('gameState', (state) => {
+        // تحديث قائمة اللاعبين
+        const newPlayers = {};
+        state.players.forEach(p => {
+          newPlayers[p.id] = {
+            id: p.id,
+            name: p.name,
+            x: p.x,
+            y: p.y,
+            color: p.color,
+            score: p.score,
+          };
+          // تحديث موقعي
+          if (p.id === myPlayer?.id) {
+            if (myPlayer) {
+              myPlayer.x = p.x;
+              myPlayer.y = p.y;
+              myPlayer.score = p.score;
+            }
+          }
+        });
+        gamePlayers = newPlayers;
+        gameGems = state.gems;
+        playerCountEl.textContent = '🟢 اللاعبون المتصلون: ' + state.players.length;
+      });
+
+      socket.on('playerJoined', (p) => {
+        gamePlayers[p.id] = {
+          id: p.id,
+          name: p.name,
+          x: p.x,
+          y: p.y,
+          color: p.color,
+          score: p.score,
+        };
+      });
+
+      socket.on('playerLeft', (id) => {
+        delete gamePlayers[id];
+      });
+
+      socket.on('disconnect', () => {
+        console.log('❌ انقطع الاتصال');
+        overlay.classList.remove('hidden');
+        playerCountEl.textContent = '🔴 انقطع الاتصال - حاول مجدداً';
+      });
+    }
+
+    // ==================== إرسال الاتجاه ====================
+    function sendDirection() {
+      if (!socket || !socket.connected) return;
+      const newDirX = targetDirX;
+      const newDirY = targetDirY;
+      if (newDirX !== dirX || newDirY !== dirY) {
+        dirX = newDirX;
+        dirY = newDirY;
+        socket.emit('setDirection', { x: dirX, y: dirY });
+      }
+    }
+    setInterval(sendDirection, 40);
+
+    // ==================== لوحة المفاتيح ====================
+    window.addEventListener('keydown', (e) => {
+      keys[e.key] = true;
+      updateKeyboardDirection();
+      e.preventDefault();
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key] = false;
+      updateKeyboardDirection();
+      e.preventDefault();
+    });
+
+    function updateKeyboardDirection() {
+      let kx = 0, ky = 0;
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) kx = -1;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) kx = 1;
+      if (keys['ArrowUp'] || keys['w'] || keys['W']) ky = -1;
+      if (keys['ArrowDown'] || keys['s'] || keys['S']) ky = 1;
+
+      if (!joystickActive) {
+        targetDirX = kx;
+        targetDirY = ky;
+      }
+    }
+
+    // ==================== عصا التحكم باللمس ====================
+    canvas.addEventListener('touchstart', (e) => {
+      for (const touch of e.changedTouches) {
+        const tx = touch.clientX;
+        const ty = touch.clientY;
+        // التحقق إذا كانت اللمسة في منطقة عصا التحكم (النصف الأيسر السفلي)
+        if (tx < canvas.width * 0.45 && ty > canvas.height * 0.45) {
+          joystickActive = true;
+          joystickTouchId = touch.identifier;
+          joystickBase.x = tx;
+          joystickBase.y = ty;
+          joystickThumb.x = tx;
+          joystickThumb.y = ty;
+          targetDirX = 0;
+          targetDirY = 0;
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!joystickActive) return;
+      for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) {
+          const tx = touch.clientX;
+          const ty = touch.clientY;
+          const dx = tx - joystickBase.x;
+          const dy = ty - joystickBase.y;
+          const maxDist = 55;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const clampDist = Math.min(dist, maxDist);
+          const angle = Math.atan2(dy, dx);
+          joystickThumb.x = joystickBase.x + Math.cos(angle) * clampDist;
+          joystickThumb.y = joystickBase.y + Math.sin(angle) * clampDist;
+
+          if (dist > 8) {
+            targetDirX = Math.cos(angle) * Math.min(dist / maxDist, 1);
+            targetDirY = Math.sin(angle) * Math.min(dist / maxDist, 1);
+          } else {
+            targetDirX = 0;
+            targetDirY = 0;
+          }
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      for (const touch of e.changedTouches) {
+        if (touch.identifier === joystickTouchId) {
+          joystickActive = false;
+          joystickTouchId = null;
+          joystickThumb.x = joystickBase.x;
+          joystickThumb.y = joystickBase.y;
+          targetDirX = 0;
+          targetDirY = 0;
+          updateKeyboardDirection(); // إعادة تفعيل لوحة المفاتيح
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchcancel', () => {
+      joystickActive = false;
+      joystickTouchId = null;
+      joystickThumb.x = joystickBase.x;
+      joystickThumb.y = joystickBase.y;
+      targetDirX = 0;
+      targetDirY = 0;
+    });
+
+    // ==================== زر الانضمام ====================
+    joinBtn.addEventListener('click', () => {
+      playerName = nameInput.value.trim() || 'لاعب';
+      nameInput.value = playerName;
+      if (!socket || !socket.connected) {
+        connectToServer();
+      }
+      if (socket && socket.connected) {
+        socket.emit('setName', playerName);
+        overlay.classList.add('hidden');
+      }
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        joinBtn.click();
+      }
+    });
+
+    // ==================== رسم اللعبة ====================
+    function drawGrid(viewLeft, viewTop, viewW, viewH) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      const gridSize = 80;
+      const startX = Math.floor(viewLeft / gridSize) * gridSize;
+      const startY = Math.floor(viewTop / gridSize) * gridSize;
+
+      for (let x = startX; x <= viewLeft + viewW; x += gridSize) {
+        const sx = x - viewLeft;
+        ctx.beginPath();
+        ctx.moveTo(sx, 0);
+        ctx.lineTo(sx, viewH);
+        ctx.stroke();
+      }
+      for (let y = startY; y <= viewTop + viewH; y += gridSize) {
+        const sy = y - viewTop;
+        ctx.beginPath();
+        ctx.moveTo(0, sy);
+        ctx.lineTo(viewW, sy);
+        ctx.stroke();
+      }
+    }
+
+    function drawWorldBorder(viewLeft, viewTop) {
+      ctx.strokeStyle = '#4ECDC4';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#4ECDC4';
+      ctx.shadowBlur = 10;
+      ctx.strokeRect(
+        -viewLeft,
+        -viewTop,
+        worldW,
+        worldH
+      );
+      ctx.shadowBlur = 0;
+    }
+
+    function drawGem(gem, viewLeft, viewTop) {
+      const sx = gem.x - viewLeft;
+      const sy = gem.y - viewTop;
+
+      // توهج
+      const glow = ctx.createRadialGradient(sx, sy, gemRadius * 0.3, sx, sy, gemRadius * 2);
+      glow.addColorStop(0, 'rgba(255, 234, 167, 0.8)');
+      glow.addColorStop(0.5, 'rgba(255, 200, 50, 0.3)');
+      glow.addColorStop(1, 'rgba(255, 200, 50, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(sx, sy, gemRadius * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // الجوهرة نفسها
+      const pulse = 1 + Math.sin(Date.now() / 400 + gem.x) * 0.15;
+      const r = gemRadius * pulse;
+      const gemGrad = ctx.createRadialGradient(sx - r * 0.3, sy - r * 0.3, r * 0.1, sx, sy, r);
+      gemGrad.addColorStop(0, '#FFFDE7');
+      gemGrad.addColorStop(0.4, '#FFE082');
+      gemGrad.addColorStop(0.8, '#FF8F00');
+      gemGrad.addColorStop(1, '#E65100');
+      ctx.fillStyle = gemGrad;
+      ctx.beginPath();
+      // شكل ماسي
+      ctx.moveTo(sx, sy - r);
+      ctx.lineTo(sx + r * 0.7, sy);
+      ctx.lineTo(sx, sy + r);
+      ctx.lineTo(sx - r * 0.7, sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawPlayer(p, viewLeft, viewTop, isMe) {
+      const sx = p.x - viewLeft;
+      const sy = p.y - viewTop;
+
+      if (isMe) {
+        // توهج خاص للاعبي
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 20;
+      }
+
+      // الجسم
+      const bodyGrad = ctx.createRadialGradient(sx - playerRadius * 0.25, sy - playerRadius * 0.25, playerRadius * 0.1, sx, sy, playerRadius);
+      bodyGrad.addColorStop(0, '#ffffff');
+      bodyGrad.addColorStop(0.3, p.color);
+      bodyGrad.addColorStop(1, '#000000');
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, playerRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // حافة
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+
+      // الاسم
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 13px "Segoe UI", Tahoma, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText((p.name || 'لاعب').substring(0, 12), sx, sy - playerRadius - 12);
+
+      // النقاط
+      if (p.score > 0) {
+        ctx.fillStyle = '#FFE082';
+        ctx.font = 'bold 10px "Segoe UI", Tahoma, sans-serif';
+        ctx.fillText('💎' + p.score, sx, sy + playerRadius + 18);
+      }
+    }
+
+    function drawMinimap(viewLeft, viewTop, viewW, viewH) {
+      const mmW = 100;
+      const mmH = 100;
+      const mmX = canvas.width - mmW - 15;
+      const mmY = canvas.height - mmH - 15;
+
+      // خلفية
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(mmX, mmY, mmW, mmH, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      const scaleX = mmW / worldW;
+      const scaleY = mmH / worldH;
+
+      // الجواهر
+      ctx.fillStyle = '#FFE082';
+      for (const gem of gameGems) {
+        ctx.fillRect(mmX + gem.x * scaleX - 0.8, mmY + gem.y * scaleY - 0.8, 1.6, 1.6);
+      }
+
+      // اللاعبون الآخرون
+      for (const p of Object.values(gamePlayers)) {
+        if (p.id === myPlayer?.id) continue;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(mmX + p.x * scaleX, mmY + p.y * scaleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // أنا
+      if (myPlayer) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = myPlayer.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(mmX + myPlayer.x * scaleX, mmY + myPlayer.y * scaleY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // إطار الكاميرا
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(
+        mmX + viewLeft * scaleX,
+        mmY + viewTop * scaleY,
+        viewW * scaleX,
+        viewH * scaleY
+      );
+    }
+
+    function drawJoystick() {
+      if (!joystickActive && targetDirX === 0 && targetDirY === 0) {
+        // رسم خافت للعصا
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.arc(joystickBase.x, joystickBase.y, 65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // نقطة المركز
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(joystickBase.x, joystickBase.y, 25, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
+      // قاعدة العصا
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(joystickBase.x, joystickBase.y, 65, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // زر العصا
+      const thumbGrad = ctx.createRadialGradient(
+        joystickThumb.x - 5, joystickThumb.y - 5, 5,
+        joystickThumb.x, joystickThumb.y, 30
+      );
+      thumbGrad.addColorStop(0, 'rgba(255,255,255,0.9)');
+      thumbGrad.addColorStop(1, 'rgba(255,255,255,0.3)');
+      ctx.fillStyle = thumbGrad;
+      ctx.beginPath();
+      ctx.arc(joystickThumb.x, joystickThumb.y, 30, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawScoreboard() {
+      const players = Object.values(gamePlayers).sort((a, b) => b.score - a.score);
+      const top5 = players.slice(0, 5);
+
+      const sbX = 15;
+      const sbY = 15;
+      const sbW = 150;
+      const lineH = 22;
+      const sbH = top5.length * lineH + 40;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(sbX, sbY, sbW, sbH, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#FFE082';
+      ctx.font = 'bold 12px "Segoe UI", Tahoma, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('🏆 المتصدرون', sbX + sbW - 10, sbY + 22);
+
+      ctx.textAlign = 'right';
+      top5.forEach((p, i) => {
+        const y = sbY + 40 + i * lineH;
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
+        const isMe = p.id === myPlayer?.id;
+        ctx.fillStyle = isMe ? '#4ECDC4' : '#ddd';
+        ctx.font = `${isMe ? 'bold ' : ''}11px "Segoe UI", Tahoma, sans-serif`;
+        ctx.fillText(
+          `${medal} ${(p.name || 'لاعب').substring(0, 8)} - ${p.score}`,
+          sbX + sbW - 10,
+          y
+        );
+      });
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!myPlayer) {
+        // لم ينضم بعد
+        ctx.fillStyle = '#aaa';
+        ctx.font = '18px "Segoe UI", Tahoma, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('بانتظار الاتصال...', canvas.width / 2, canvas.height / 2);
+        requestAnimationFrame(render);
+        return;
+      }
+
+      const viewW = canvas.width;
+      const viewH = canvas.height;
+
+      // تحديد مجال الرؤية
+      let viewLeft = myPlayer.x - viewW / 2;
+      let viewTop = myPlayer.y - viewH / 2;
+      viewLeft = Math.max(0, Math.min(worldW - viewW, viewLeft));
+      viewTop = Math.max(0, Math.min(worldH - viewH, viewTop));
+
+      // خلفية العالم
+      ctx.fillStyle = '#0d0d24';
+      ctx.fillRect(0, 0, viewW, viewH);
+
+      // الشبكة
+      drawGrid(viewLeft, viewTop, viewW, viewH);
+
+      // حدود العالم
+      drawWorldBorder(viewLeft, viewTop);
+
+      // الجواهر
+      for (const gem of gameGems) {
+        // التحقق من أن الجوهرة مرئية
+        if (gem.x > viewLeft - 50 && gem.x < viewLeft + viewW + 50 &&
+            gem.y > viewTop - 50 && gem.y < viewTop + viewH + 50) {
+          drawGem(gem, viewLeft, viewTop);
+        }
+      }
+
+      // اللاعبون الآخرون
+      for (const p of Object.values(gamePlayers)) {
+        if (p.id === myPlayer.id) continue;
+        if (p.x > viewLeft - 80 && p.x < viewLeft + viewW + 80 &&
+            p.y > viewTop - 80 && p.y < viewTop + viewH + 80) {
+          drawPlayer(p, viewLeft, viewTop, false);
+        }
+      }
+
+      // أنا
+      if (myPlayer) {
+        drawPlayer(myPlayer, viewLeft, viewTop, true);
+      }
+
+      // واجهة المستخدم
+      drawMinimap(viewLeft, viewTop, viewW, viewH);
+      drawScoreboard();
+      drawJoystick();
+
+      // عدد اللاعبين
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '12px "Segoe UI", Tahoma, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`👥 ${Object.keys(gamePlayers).length}`, canvas.width - 115, canvas.height - 125);
+
+      requestAnimationFrame(render);
+    }
+
+    // ==================== بدء اللعبة ====================
+    // محاولة اتصال أولية
+    connectToServer();
+
+    // بدء حلقة الرسم
+    requestAnimationFrame(render);
+
+    console.log('💎 Gem Hunt جاهزة!');
+    console.log('📱 استخدم عصا التحكم على الهاتف');
+    console.log('⌨️ استخدم WASD أو الأسهم على سطح المكتب');
+  </script>
+</body>
+</html>
