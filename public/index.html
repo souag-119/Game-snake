@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>حرب الأمم</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -46,22 +46,33 @@
     </div>
     <div id="game-container">
       <canvas id="game-canvas"></canvas>
-      <div id="sidebar">
-        <h3>لوحة التحكم</h3>
-        <div id="nation-info"></div>
-        <div id="actions">
-          <!-- ستظهر الأزرار حسب الدور -->
-        </div>
-        <div id="chat-box">
-          <h4>الدردشة</h4>
-          <div id="chat-messages"></div>
-          <input type="text" id="chat-input" placeholder="اكتب رسالة...">
-          <button id="send-chat">إرسال</button>
-        </div>
+    </div>
+    <div id="toolbar">
+      <!-- أزرار اللاعب الافتراضية -->
+      <div class="toolbar-group" id="player-tools">
+        <button class="tool-btn" data-action="pan">✋ تحريك</button>
+        <button class="tool-btn" data-action="select">🔍 تحديد</button>
+        <button class="tool-btn" data-action="attack">⚔️ هجوم</button>
+        <button class="tool-btn" data-action="diplomacy">🤝 دبلوماسية</button>
+      </div>
+      <!-- أزرار المالك تظهر فقط عند الدخول كمالك -->
+      <div class="toolbar-group" id="owner-tools" style="display:none;">
+        <button class="tool-btn" data-action="add-resource">⛏️ موارد</button>
+        <button class="tool-btn" data-action="edit-terrain">🏔️ تضاريس</button>
+        <button class="tool-btn" data-action="edit-nation">🏴 دولة</button>
+        <button class="tool-btn" data-action="settings">⚙️ إعدادات</button>
+      </div>
+    </div>
+    <!-- شريط الدردشة مخفي افتراضياً، يمكن إظهاره بزر -->
+    <div id="chat-panel" style="display:none;">
+      <div id="chat-messages"></div>
+      <div id="chat-input-area">
+        <input type="text" id="chat-input" placeholder="اكتب رسالة...">
+        <button id="send-chat">إرسال</button>
       </div>
     </div>
   </div>
 
   <script src="client.js"></script>
 </body>
-  </html>
+          </html>
