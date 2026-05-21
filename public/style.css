@@ -1,0 +1,119 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#splash-screen {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.splash-logo img {
+  max-width: 300px;
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
+}
+
+#main-menu, #game-interface {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#main-menu h1 {
+  font-size: 3rem;
+  margin-bottom: 2rem;
+  color: gold;
+}
+
+#login-section {
+  background: #16213e;
+  padding: 2rem;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 300px;
+}
+
+input, button {
+  padding: 10px;
+  border-radius: 5px;
+  border: none;
+  font-size: 1rem;
+}
+
+button {
+  background: #0f3460;
+  color: white;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+button:hover {
+  background: #533483;
+}
+
+#game-interface {
+  flex-direction: column;
+  display: none;
+}
+
+#game-header {
+  width: 100%;
+  background: #0f3460;
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+#game-container {
+  display: flex;
+  flex: 1;
+  width: 100%;
+}
+
+#game-canvas {
+  flex: 3;
+  background: #2d2d44;
+}
+
+#sidebar {
+  flex: 1;
+  background: #16213e;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow-y: auto;
+}
+
+#chat-box {
+  margin-top: auto;
+  border-top: 1px solid #333;
+  padding-top: 10px;
+}
+
+#chat-messages {
+  height: 200px;
+  overflow-y: auto;
+  background: #0d0d1a;
+  padding: 5px;
+  border-radius: 5px;
+  }
