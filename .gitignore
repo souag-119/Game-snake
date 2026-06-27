@@ -1,6 +1,0 @@
-node_modules
-database/*
-!database/.gitkeep
-public/assets/flags/*
-!public/assets/flags/.gitkeep
-.env
