@@ -1,0 +1,2374 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Rig & Paint Studio</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "fflate": "https://unpkg.com/fflate@0.7.4/esm/browser.js"
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Tajawal:wght@400;500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        :root {
+            --acc: #ff3366;
+            --ok: #10b981;
+            --warn: #f59e0b;
+            --bg: #0b0b0e;
+            --pan: rgba(14, 14, 18, 0.97);
+            --card: rgba(255, 255, 255, 0.04);
+            --bdr: rgba(255, 255, 255, 0.07);
+            --txt: #e2e8f0;
+            --dim: #475569;
+            --mid: #94a3b8;
+            --topH: 48px;
+            --botH: 44px;
+            --safe: env(safe-area-inset-bottom, 0px);
+        }
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--txt);
+            font-family: 'Tajawal', system-ui, sans-serif;
+            touch-action: none;
+            user-select: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        /* ── TOP BAR (Landscape compact) ── */
+        #top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--topH);
+            z-index: 300;
+            background: var(--pan);
+            border-bottom: 1px solid var(--bdr);
+            display: flex;
+            align-items: center;
+            padding: 0 6px;
+            gap: 4px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .logo {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-left: 4px;
+        }
+        .logo b {
+            color: var(--acc);
+        }
+        .mode-row {
+            display: flex;
+            gap: 2px;
+            flex: 1;
+            background: rgba(0, 0, 0, .4);
+            border: 1px solid var(--bdr);
+            border-radius: 8px;
+            padding: 2px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            min-width: 0;
+        }
+        .mode-row::-webkit-scrollbar {
+            display: none;
+        }
+        .mbtn {
+            flex-shrink: 0;
+            background: none;
+            border: none;
+            color: var(--mid);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all .2s;
+            white-space: nowrap;
+            font-family: 'Tajawal', sans-serif;
+            min-height: 28px;
+            min-width: 44px;
+        }
+        .mbtn.active {
+            background: var(--acc);
+            color: #fff;
+        }
+        .icon-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 7px;
+            border: 1px solid var(--bdr);
+            background: var(--card);
+            color: var(--mid);
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all .2s;
+            background: rgba(255, 255, 255, .04);
+        }
+        .icon-btn:active {
+            opacity: .6;
+            transform: scale(.92);
+        }
+        .icon-btn.prim {
+            background: rgba(255, 51, 102, .15);
+            border-color: var(--acc);
+            color: var(--acc);
+        }
+
+        /* ── BOTTOM BAR ── */
+        #bot-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: calc(var(--botH) + var(--safe));
+            padding-bottom: var(--safe);
+            z-index: 300;
+            background: var(--pan);
+            border-top: 1px solid var(--bdr);
+            display: flex;
+            align-items: stretch;
+            padding: 0 2px;
+        }
+        .bitem {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+            font-size: 8px;
+            color: var(--dim);
+            flex: 1;
+            cursor: pointer;
+            padding: 2px 0;
+            border: none;
+            background: none;
+            transition: all .15s;
+            min-height: 36px;
+        }
+        .bitem .ico {
+            font-size: 17px;
+            line-height: 1;
+        }
+        .bitem.hi,
+        .bitem.hi .ico {
+            color: var(--acc);
+        }
+        .bitem:active {
+            background: rgba(255, 255, 255, .05);
+        }
+
+        /* ── STATUS ── */
+        #status-txt {
+            position: fixed;
+            bottom: calc(var(--botH) + 6px + var(--safe));
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: var(--mid);
+            font-family: 'Space Mono', monospace;
+            background: rgba(0, 0, 0, .7);
+            padding: 2px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 280;
+            white-space: nowrap;
+            border: 1px solid var(--bdr);
+            backdrop-filter: blur(6px);
+        }
+
+        /* ── SHEET OVERLAY ── */
+        #sheet-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .55);
+            z-index: 380;
+            display: none;
+            opacity: 0;
+            transition: opacity .25s;
+        }
+        #sheet-overlay.vis {
+            display: block;
+            opacity: 1;
+        }
+
+        /* ── BOTTOM SHEET ── */
+        .bsheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 400;
+            background: rgba(15, 15, 20, 0.99);
+            border-top: 1px solid var(--bdr);
+            border-radius: 18px 18px 0 0;
+            padding: 0 14px 20px;
+            transform: translateY(100%);
+            transition: transform .3s cubic-bezier(.4, 0, .2, 1);
+            max-height: 70vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: calc(20px + var(--safe));
+        }
+        .bsheet.open {
+            transform: translateY(0);
+        }
+        .sh-handle {
+            width: 36px;
+            height: 4px;
+            border-radius: 2px;
+            background: #2a2a35;
+            margin: 10px auto 12px;
+            cursor: pointer;
+        }
+        .sh-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--acc);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        /* ── MODAL BRUSH ── */
+        #modal-brush {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.92);
+            width: 88%;
+            max-width: 300px;
+            background: rgba(15, 15, 20, 0.99);
+            border: 1px solid var(--bdr);
+            border-radius: 16px;
+            padding: 18px;
+            z-index: 400;
+            opacity: 0;
+            pointer-events: none;
+            transition: all .25s cubic-bezier(.4, 0, .2, 1);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        #modal-brush.open {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-close {
+            position: absolute;
+            top: 12px;
+            left: 14px;
+            background: none;
+            border: none;
+            color: var(--dim);
+            font-size: 15px;
+            cursor: pointer;
+            padding: 4px;
+        }
+        .modal-close:active {
+            color: var(--acc);
+        }
+
+        /* ── FLOATING BTNS ── */
+        .float-btn {
+            position: fixed;
+            right: 12px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--pan);
+            border: 2px solid var(--bdr);
+            color: #fff;
+            font-size: 18px;
+            z-index: 350;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+            transition: all .2s;
+            -webkit-touch-callout: none;
+            backdrop-filter: blur(8px);
+        }
+        .float-btn:active {
+            transform: scale(0.90);
+        }
+        .float-btn.active {
+            background: var(--acc);
+            border-color: var(--acc);
+            box-shadow: 0 0 20px rgba(255, 51, 102, .4);
+        }
+        #floating-brush-btn {
+            bottom: calc(var(--botH) + 16px + var(--safe));
+        }
+        #floating-fill-btn {
+            bottom: calc(var(--botH) + 68px + var(--safe));
+            font-size: 16px;
+        }
+
+        /* ── FILL CONFIRM ── */
+        #fill-confirm-bar {
+            position: fixed;
+            top: calc(var(--topH) + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 6px;
+            z-index: 400;
+            background: rgba(0, 0, 0, .88);
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--bdr);
+            backdrop-filter: blur(10px);
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+            width: 90%;
+            max-width: 320px;
+        }
+        .fc-txt {
+            font-size: 11px;
+            color: #fff;
+            margin-bottom: 4px;
+            text-align: center;
+        }
+        .fc-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+        }
+        .fc-btn {
+            flex: 1;
+            padding: 7px 0;
+            border: none;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Tajawal', sans-serif;
+            font-size: 11px;
+        }
+        #btn-apply-fill {
+            background: var(--ok);
+            color: #fff;
+        }
+        #btn-cancel-fill {
+            background: var(--dim);
+            color: #fff;
+        }
+
+        /* ── SLIDERS ── */
+        .sl-row {
+            margin-bottom: 12px;
+        }
+        .sl-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--mid);
+            margin-bottom: 6px;
+            align-items: center;
+        }
+        .sl-val {
+            color: #fff;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+        }
+        input[type=range] {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 5px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, .1);
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--acc);
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, .2);
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--acc);
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, .2);
+        }
+
+        /* ── BONE LIST ── */
+        #bone-list {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .bone-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 9px;
+            cursor: pointer;
+            font-size: 13px;
+            border: 1px solid transparent;
+            transition: all .15s;
+            color: var(--mid);
+        }
+        .bone-item:active {
+            opacity: .6;
+        }
+        .bone-item.sel {
+            background: rgba(255, 51, 102, .12);
+            border-color: rgba(255, 51, 102, .35);
+            color: #fff;
+        }
+        .bdot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* ── WEIGHT LEGEND ── */
+        #wlegend {
+            position: fixed;
+            top: calc(var(--topH) + 8px);
+            right: 10px;
+            z-index: 250;
+            background: var(--pan);
+            border: 1px solid var(--bdr);
+            border-radius: 8px;
+            padding: 7px 10px;
+            display: none;
+            min-width: 90px;
+            backdrop-filter: blur(8px);
+        }
+        .wl-bar {
+            height: 7px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #00f, #0ff, #0f0, #ff0, #f00);
+            margin-bottom: 3px;
+        }
+        .wl-lbl {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            color: var(--dim);
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── PAINT HINT ── */
+        #paint-hint {
+            position: fixed;
+            top: calc(var(--topH) + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, .8);
+            border: 1px solid var(--bdr);
+            border-radius: 7px;
+            padding: 5px 14px;
+            font-size: 10px;
+            color: var(--mid);
+            z-index: 250;
+            display: none;
+            white-space: nowrap;
+            backdrop-filter: blur(8px);
+            text-align: center;
+        }
+        #paint-hint b {
+            color: var(--acc);
+        }
+
+        /* ── BRUSH CURSOR ── */
+        #brush-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 240;
+            display: none;
+            border: 2px solid rgba(255, 51, 102, .8);
+            border-radius: 50%;
+            box-shadow: 0 0 14px rgba(255, 51, 102, .3);
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 30px;
+        }
+
+        /* ── TRANSFORM BAR (vertical for landscape) ── */
+        #transform-bar {
+            position: fixed;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 250;
+            background: var(--pan);
+            border: 1px solid var(--bdr);
+            border-radius: 11px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .tl-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 7px;
+            border: 1px solid var(--bdr);
+            background: var(--card);
+            color: var(--mid);
+            cursor: pointer;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+        }
+        .tl-btn:active {
+            transform: scale(.9);
+        }
+        .tl-btn.active {
+            background: var(--acc);
+            border-color: var(--acc);
+            color: #fff;
+        }
+        .tl-sep {
+            width: 100%;
+            height: 1px;
+            background: var(--bdr);
+            margin: 2px 0;
+        }
+
+        /* ── RIGGING TOOLBAR (in top bar) ── */
+        #rig-tools {
+            display: none;
+            gap: 3px;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        #rig-tools.show {
+            display: flex;
+        }
+        .rig-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--bdr);
+            background: var(--card);
+            color: var(--mid);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Tajawal', sans-serif;
+            transition: all .2s;
+            min-height: 28px;
+            white-space: nowrap;
+        }
+        .rig-btn:active {
+            transform: scale(.92);
+        }
+        .rig-btn.active {
+            background: var(--acc);
+            border-color: var(--acc);
+            color: #fff;
+        }
+        .rig-btn.danger {
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, .3);
+        }
+        .rig-btn.danger:active {
+            background: rgba(239, 68, 68, .2);
+        }
+        .rig-btn.ok {
+            color: var(--ok);
+            border-color: rgba(16, 185, 129, .3);
+        }
+        .rig-btn.ok:active {
+            background: rgba(16, 185, 129, .15);
+        }
+        .rig-btn.warn {
+            color: var(--warn);
+            border-color: rgba(245, 158, 11, .3);
+        }
+
+        /* ── ACTION BTNS ── */
+        .abt {
+            width: 100%;
+            padding: 11px;
+            border-radius: 9px;
+            border: 1px solid var(--bdr);
+            background: var(--card);
+            color: var(--mid);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
+            transition: all .2s;
+            margin-bottom: 6px;
+            font-family: 'Tajawal', sans-serif;
+        }
+        .abt:active {
+            opacity: .6;
+        }
+        .abt.prim {
+            background: rgba(255, 51, 102, .12);
+            border-color: var(--acc);
+            color: var(--acc);
+        }
+        .abt.ok {
+            background: rgba(16, 185, 129, .12);
+            border-color: var(--ok);
+            color: var(--ok);
+        }
+        .abt.warn {
+            background: rgba(245, 158, 11, .12);
+            border-color: var(--warn);
+            color: var(--warn);
+        }
+        .abt.danger {
+            background: rgba(239, 68, 68, .1);
+            border-color: rgba(239, 68, 68, .3);
+            color: #ef4444;
+        }
+        hr.div {
+            border: none;
+            border-top: 1px solid var(--bdr);
+            margin: 12px 0;
+        }
+
+        /* ── LOADING ── */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .92);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            gap: 12px;
+        }
+        .spin {
+            width: 32px;
+            height: 32px;
+            border: 2px solid rgba(255, 255, 255, .1);
+            border-top-color: var(--acc);
+            border-radius: 50%;
+            animation: sp .7s linear infinite;
+        }
+        @keyframes sp {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        #loading p {
+            font-size: 12px;
+            color: var(--mid);
+            font-family: 'Space Mono', monospace;
+        }
+
+        /* ── RESPONSIVE TWEAKS ── */
+        @media (max-width: 500px) {
+            :root {
+                --topH: 44px;
+                --botH: 40px;
+            }
+            .logo {
+                font-size: 10px;
+            }
+            .mbtn {
+                font-size: 10px;
+                padding: 3px 7px;
+                min-height: 24px;
+                min-width: 36px;
+            }
+            .icon-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 13px;
+            }
+            .tl-btn {
+                width: 34px;
+                height: 34px;
+                font-size: 13px;
+            }
+            #transform-bar {
+                right: 4px;
+                padding: 4px;
+                gap: 3px;
+            }
+            .float-btn {
+                width: 38px;
+                height: 38px;
+                font-size: 16px;
+                right: 8px;
+            }
+            #floating-brush-btn {
+                bottom: calc(var(--botH) + 12px + var(--safe));
+            }
+            #floating-fill-btn {
+                bottom: calc(var(--botH) + 56px + var(--safe));
+            }
+            .rig-btn {
+                font-size: 9px;
+                padding: 3px 7px;
+                min-height: 24px;
+            }
+            #status-txt {
+                font-size: 8px;
+                padding: 1px 10px;
+            }
+            .bsheet {
+                padding: 0 10px 16px;
+                max-height: 60vh;
+            }
+            .bone-item {
+                padding: 8px 10px;
+                font-size: 12px;
+            }
+        }
+
+        @media (orientation: landscape) and (max-height: 450px) {
+            :root {
+                --topH: 38px;
+                --botH: 34px;
+            }
+            .logo {
+                font-size: 9px;
+            }
+            .mbtn {
+                font-size: 9px;
+                padding: 2px 6px;
+                min-height: 20px;
+                min-width: 32px;
+            }
+            .icon-btn {
+                width: 24px;
+                height: 24px;
+                font-size: 11px;
+            }
+            .tl-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 11px;
+            }
+            #transform-bar {
+                right: 3px;
+                padding: 3px;
+                gap: 2px;
+            }
+            .float-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+                right: 6px;
+            }
+            #floating-brush-btn {
+                bottom: calc(var(--botH) + 10px + var(--safe));
+            }
+            #floating-fill-btn {
+                bottom: calc(var(--botH) + 48px + var(--safe));
+            }
+            .rig-btn {
+                font-size: 8px;
+                padding: 2px 6px;
+                min-height: 20px;
+            }
+            #status-txt {
+                font-size: 7px;
+                padding: 1px 8px;
+                bottom: calc(var(--botH) + 4px + var(--safe));
+            }
+            .bitem .ico {
+                font-size: 14px;
+            }
+            .bitem {
+                font-size: 7px;
+                min-height: 28px;
+            }
+            #paint-hint {
+                font-size: 8px;
+                padding: 3px 10px;
+                top: calc(var(--topH) + 4px);
+            }
+            #wlegend {
+                padding: 4px 8px;
+                min-width: 70px;
+                top: calc(var(--topH) + 4px);
+            }
+            .wl-bar {
+                height: 5px;
+            }
+            .bsheet {
+                max-height: 50vh;
+                padding: 0 8px 12px;
+            }
+            .sh-title {
+                font-size: 10px;
+                margin-bottom: 8px;
+            }
+            .bone-item {
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            .abt {
+                padding: 7px;
+                font-size: 10px;
+            }
+            #modal-brush {
+                max-width: 260px;
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading"><div class="spin"></div><p id="load-txt">جاري التحميل...</p></div>
+
+    <!-- TOP BAR -->
+    <div id="top-bar">
+        <div class="logo">3D<b>.</b>RIG</div>
+        <div class="mode-row">
+            <button class="mbtn active" onclick="setMode('OBJECT',this)">Object</button>
+            <button class="mbtn" onclick="setMode('RIGGING',this)">Rigging</button>
+            <button class="mbtn" onclick="setMode('PAINT',this)">Paint</button>
+        </div>
+
+        <!-- Rigging tools -->
+        <div id="rig-tools">
+            <button class="rig-btn" id="btn-add-bone" onclick="toggleAddBone()">✚ عظمة</button>
+            <button class="rig-btn danger" id="btn-del-bone" onclick="deleteSelectedBone()">✖ حذف</button>
+            <button class="rig-btn ok" onclick="applyRig()">✓ تطبيق</button>
+        </div>
+
+        <button class="icon-btn" onclick="document.getElementById('file-input').click()">📂</button>
+        <button class="icon-btn" onclick="exportModel()">📤</button>
+        <input type="file" id="file-input" accept=".obj,.fbx,.gltf,.glb" hidden>
+    </div>
+
+    <!-- PAINT HINT -->
+    <div id="paint-hint">وضع التلوين — اختر <b>عظمة</b> ثم فعّل الفرشاة</div>
+
+    <!-- WEIGHT LEGEND -->
+    <div id="wlegend">
+        <div style="font-size:8px;font-weight:700;color:var(--dim);margin-bottom:4px;letter-spacing:1px;">الأوزان</div>
+        <div class="wl-bar"></div>
+        <div class="wl-lbl"><span>0.0</span><span>0.5</span><span>1.0</span></div>
+    </div>
+
+    <!-- BRUSH CURSOR -->
+    <div id="brush-cursor"></div>
+
+    <!-- TRANSFORM BAR (vertical) -->
+    <div id="transform-bar">
+        <button class="tl-btn active" id="t-translate" onclick="setTransform('translate')">✥</button>
+        <button class="tl-btn" id="t-rotate" onclick="setTransform('rotate')">↻</button>
+        <button class="tl-btn" id="t-scale" onclick="setTransform('scale')">⬜</button>
+        <div class="tl-sep"></div>
+        <button class="tl-btn" onclick="resetCamera()">🎥</button>
+        <button class="tl-btn" id="t-wire" onclick="toggleWireframe()">⬡</button>
+    </div>
+
+    <!-- STATUS -->
+    <div id="status-txt">Object Mode</div>
+
+    <!-- FLOATING BTNS -->
+    <button class="float-btn" id="floating-brush-btn">🖌️</button>
+    <button class="float-btn" id="floating-fill-btn" title="طلاء جزء منفصل">🪣</button>
+
+    <!-- FILL CONFIRM -->
+    <div id="fill-confirm-bar">
+        <div class="fc-txt">تم تحديد جزء منفصل. تطبيق الوزن؟</div>
+        <div class="fc-row">
+            <button class="fc-btn" id="btn-apply-fill" onclick="applyFillWeight()">تطبيق</button>
+            <button class="fc-btn" id="btn-cancel-fill" onclick="cancelFill()">إلغاء</button>
+        </div>
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bot-bar">
+        <button class="bitem" id="bbar-bones" onclick="openSheet('bones')">
+            <span class="ico">🦴</span><span>عظام</span>
+        </button>
+        <button class="bitem" onclick="openSheet('file')">
+            <span class="ico">📁</span><span>ملفات</span>
+        </button>
+        <button class="bitem" onclick="resetCamera()">
+            <span class="ico">🎥</span><span>كاميرا</span>
+        </button>
+        <button class="bitem" onclick="toggleWireframe()">
+            <span class="ico">⬡</span><span>Wire</span>
+        </button>
+    </div>
+
+    <!-- OVERLAY -->
+    <div id="sheet-overlay" onclick="closeSheet()"></div>
+
+    <!-- BRUSH MODAL -->
+    <div id="modal-brush">
+        <button class="modal-close" onclick="closeSheet()">✖</button>
+        <div class="sh-title" style="margin-top:0;text-align:center;">إعدادات الفرشاة</div>
+        <div style="background:rgba(255,255,255,.04);border:1px solid var(--bdr);border-radius:8px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--mid);text-align:center;">
+            العظمة:&nbsp;<b id="sel-bone-name" style="color:var(--acc);">—</b>
+        </div>
+        <div class="sl-row">
+            <div class="sl-label"><span>حجم الفرشاة</span><span class="sl-val" id="v-radius">0.50</span></div>
+            <input type="range" id="brush-radius" min="0.05" max="3.0" step="0.05" value="0.5"
+            oninput="document.getElementById('v-radius').textContent=parseFloat(this.value).toFixed(2);updateCursorSize()">
+        </div>
+        <div class="sl-row">
+            <div class="sl-label"><span>الوزن المستهدف</span><span class="sl-val" id="v-weight">1.00</span></div>
+            <input type="range" id="brush-weight" min="0" max="1" step="0.05" value="1.0"
+            oninput="document.getElementById('v-weight').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="sl-row">
+            <div class="sl-label"><span>قوة الفرشاة</span><span class="sl-val" id="v-strength">0.30</span></div>
+            <input type="range" id="brush-strength" min="0.01" max="1.0" step="0.01" value="0.3"
+            oninput="document.getElementById('v-strength').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <hr class="div">
+        <button class="abt warn" onclick="resetBoneWeights()">🔄 صفّر أوزان العظمة</button>
+        <button class="abt ok" onclick="applyPaint()">✅ تطبيق وخروج</button>
+    </div>
+
+    <!-- SHEET: BONES -->
+    <div class="bsheet" id="sheet-bones">
+        <div class="sh-handle" onclick="closeSheet()"></div>
+        <div class="sh-title">🦴 قائمة العظام</div>
+        <div id="bone-list">
+            <div style="font-size:12px;color:var(--dim)">لا توجد عظام</div>
+        </div>
+    </div>
+
+    <!-- SHEET: FILE -->
+    <div class="bsheet" id="sheet-file">
+        <div class="sh-handle" onclick="closeSheet()"></div>
+        <div class="sh-title">📁 الملفات</div>
+        <button class="abt" onclick="document.getElementById('file-input').click();closeSheet()">
+            📂 استيراد (OBJ · FBX · GLTF · GLB)
+        </button>
+        <button class="abt prim" onclick="exportModel();closeSheet()">
+            📤 تصدير GLTF
+        </button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+        /* ─── STATE ────────────────────────────────────────────── */
+        let scene, camera, renderer, orbit, txCtrl, raycaster;
+        const modelGroup = new THREE.Group();
+        let skinnedMeshes = [];
+        let boneMarkers = [];
+        let boneLines = [];
+        const origMats = new Map();
+        let currentMode = 'OBJECT';
+        let selBone = null;
+        let selBoneIdx = -1;
+        let brushOn = false;
+        let fillModeOn = false;
+        let isPainting = false;
+        let wireframe = false;
+        let fillSelection = null;
+        let addBoneMode = false;
+        let boneContainer = new THREE.Group();
+        let userBones = [];
+        let isRigApplied = false;
+        let tempMeshForRig = null; // mesh being rigged
+
+        const mouse = new THREE.Vector2();
+        const BONE_COLS = [0xffd700, 0xff6b35, 0x4ecdc4, 0xa8dadc, 0xe9c46a, 0xe76f51, 0x2ec4b6, 0xff9f1c, 0x845ec2, 0xff9671];
+
+        /* ─── INIT ─────────────────────────────────────────────── */
+        init();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0b0b0e);
+            scene.fog = new THREE.Fog(0x0b0b0e, 40, 80);
+            scene.add(modelGroup);
+
+            camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 500);
+            camera.position.set(0, 4, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "default" });
+            renderer.setSize(innerWidth, innerHeight);
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Lights
+            const amb = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(amb);
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(6, 12, 6);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(512, 512);
+            scene.add(sun);
+            const fill = new THREE.DirectionalLight(0x6688ff, 0.25);
+            fill.position.set(-5, 2, -5);
+            scene.add(fill);
+            const grid = new THREE.GridHelper(30, 30, 0x1f1f2a, 0x151519);
+            scene.add(grid);
+
+            orbit = new OrbitControls(camera, renderer.domElement);
+            orbit.enableDamping = true;
+            orbit.dampingFactor = 0.08;
+            orbit.target.set(0, 2.5, 0);
+
+            txCtrl = new TransformControls(camera, renderer.domElement);
+            txCtrl.addEventListener('dragging-changed', e => orbit.enabled = !e.value);
+            scene.add(txCtrl);
+
+            raycaster = new THREE.Raycaster();
+            raycaster.params.Mesh.threshold = 0.35;
+
+            const cv = renderer.domElement;
+            cv.addEventListener('pointerdown', onPtrDown);
+            cv.addEventListener('pointermove', onPtrMove);
+            cv.addEventListener('pointerup', onPtrUp);
+            cv.addEventListener('pointercancel', onPtrUp);
+            window.addEventListener('resize', onResize);
+            window.addEventListener('keydown', onKeyDown);
+            document.getElementById('file-input').addEventListener('change', handleFile);
+
+            setupFloatingButtons();
+            buildDefault();
+            animate();
+        }
+
+        function setupFloatingButtons() {
+            const fBtn = document.getElementById('floating-brush-btn');
+            const fillBtn = document.getElementById('floating-fill-btn');
+            let pressTimer, isLongPress = false;
+
+            const startPress = (e) => {
+                if (e.type === 'touchstart') e.preventDefault();
+                isLongPress = false;
+                pressTimer = setTimeout(() => { isLongPress = true;
+                    openBrushModal(); }, 400);
+            };
+            const endPress = (e) => {
+                if (e.type === 'touchend') e.preventDefault();
+                clearTimeout(pressTimer);
+                if (!isLongPress) toggleBrush();
+            };
+            fBtn.addEventListener('touchstart', startPress, { passive: false });
+            fBtn.addEventListener('touchend', endPress, { passive: false });
+            fBtn.addEventListener('mousedown', startPress);
+            fBtn.addEventListener('mouseup', endPress);
+            fBtn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+            fBtn.oncontextmenu = e => e.preventDefault();
+
+            fillBtn.addEventListener('click', () => toggleFillMode());
+        }
+
+        /* ─── DEFAULT MODEL ────────────────────────────────────── */
+        function buildDefault() {
+            const geo = new THREE.CylinderGeometry(0.45, 0.38, 6, 10, 24);
+            geo.translate(0, 3, 0);
+            const bRoot = mkBone('Root', 0, 0, 0),
+                bHip = mkBone('Hip', 0, 1.8, 0),
+                bChest = mkBone('Chest', 0, 1.8, 0),
+                bHead = mkBone('Head', 0, 1.8, 0);
+            bRoot.add(bHip);
+            bHip.add(bChest);
+            bChest.add(bHead);
+            const skel = new THREE.Skeleton([bRoot, bHip, bChest, bHead]);
+            const pos = geo.attributes.position,
+                N = pos.count;
+            const si = new Uint16Array(N * 4),
+                sw = new Float32Array(N * 4);
+            for (let i = 0; i < N; i++) {
+                const t = THREE.MathUtils.clamp(pos.getY(i) / 6, 0, 1);
+                const seg = Math.min(Math.floor(t * 3), 2);
+                const frac = smoothstep((t * 3) - seg);
+                const b = i * 4;
+                si[b] = seg;
+                sw[b] = 1 - frac;
+                si[b + 1] = seg + 1;
+                sw[b + 1] = frac;
+            }
+            geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+            geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+            const mat = new THREE.MeshStandardMaterial({ color: 0x4488ff, roughness: 0.55, metalness: 0.1 });
+            const mesh = new THREE.SkinnedMesh(geo, mat);
+            mesh.name = 'DefaultBody';
+            mesh.castShadow = mesh.receiveShadow = true;
+            mesh.add(bRoot);
+            mesh.bind(skel);
+            mesh.normalizeSkinWeights();
+            modelGroup.add(mesh);
+            skinnedMeshes = [mesh];
+            isRigApplied = true;
+            rebuildBoneViz(skel);
+            refreshBoneList();
+            txCtrl.attach(modelGroup);
+            updStatus();
+        }
+
+        function mkBone(n, x, y, z) {
+            const b = new THREE.Bone();
+            b.name = n;
+            b.position.set(x, y, z);
+            return b;
+        }
+
+        function smoothstep(t) { return t * t * (3 - 2 * t); }
+
+        /* ─── BONE MARKERS ─────────────────────────────────────── */
+        function rebuildBoneViz(skel) {
+            clearBoneViz();
+            if (!skel) return;
+            skel.bones.forEach((b, idx) => {
+                const col = BONE_COLS[idx % BONE_COLS.length];
+                const m = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.6, 6, 4),
+                    new THREE.MeshBasicMaterial({ color: col, depthTest: false, transparent: true, opacity: .9 })
+                );
+                m.renderOrder = 999;
+                m.userData = { bone: b, boneIndex: idx, baseColor: col };
+                b.userData.marker = m;
+                scene.add(m);
+                boneMarkers.push(m);
+                if (b.parent && b.parent.isBone) {
+                    const pts = new Float32Array(6);
+                    const lg = new THREE.BufferGeometry();
+                    lg.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+                    const ln = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: col, depthTest: false,
+                        transparent: true, opacity: .35 }));
+                    ln.renderOrder = 998;
+                    ln.userData = { p: b.parent, c: b };
+                    scene.add(ln);
+                    boneLines.push(ln);
+                }
+            });
+            updateBoneMarkers();
+        }
+
+        function clearBoneViz() {
+            boneMarkers.forEach(m => scene.remove(m));
+            boneLines.forEach(l => scene.remove(l));
+            boneMarkers = [];
+            boneLines = [];
+        }
+
+        function updateBoneMarkers() {
+            boneMarkers.forEach(m => {
+                if (m.userData.bone) {
+                    m.position.setFromMatrixPosition(m.userData.bone.matrixWorld);
+                    const dist = camera.position.distanceTo(m.position);
+                    const sc = Math.max(0.008, dist * 0.005);
+                    m.scale.setScalar(sc);
+                }
+            });
+            boneLines.forEach(ln => {
+                const pa = ln.geometry.attributes.position;
+                if (ln.userData.p && ln.userData.c) {
+                    const p = new THREE.Vector3().setFromMatrixPosition(ln.userData.p.matrixWorld);
+                    const c = new THREE.Vector3().setFromMatrixPosition(ln.userData.c.matrixWorld);
+                    pa.setXYZ(0, p.x, p.y, p.z);
+                    pa.setXYZ(1, c.x, c.y, c.z);
+                    pa.needsUpdate = true;
+                }
+            });
+        }
+
+        function setBoneViz(v) {
+            boneMarkers.forEach(m => m.visible = v);
+            boneLines.forEach(l => l.visible = v);
+        }
+
+        /* ─── SELECT BONE (improved hit) ────────────────────── */
+        function selectBoneAtPointer(clientX, clientY) {
+            setMouseXY(clientX, clientY);
+            raycaster.setFromCamera(mouse, camera);
+
+            // First check bone markers with expanded threshold
+            const hits = raycaster.intersectObjects(boneMarkers);
+            if (hits.length) {
+                selectMarker(hits[0].object);
+                return true;
+            }
+
+            // Fallback: check distance from ray to bone positions
+            const ray = raycaster.ray;
+            let best = null,
+                bestDist = Infinity;
+            for (const m of boneMarkers) {
+                const pos = m.position.clone();
+                const dist = ray.distanceToPoint(pos);
+                // Use a threshold based on camera distance
+                const camDist = camera.position.distanceTo(pos);
+                const threshold = Math.max(0.08, camDist * 0.015);
+                if (dist < threshold && dist < bestDist) {
+                    bestDist = dist;
+                    best = m;
+                }
+            }
+            if (best) {
+                selectMarker(best);
+                return true;
+            }
+            return false;
+        }
+
+        function selectMarker(marker) {
+            if (selBone?.userData?.marker) {
+                const prev = selBone.userData.marker;
+                prev.material.color.setHex(prev.userData.baseColor);
+            }
+            selBone = marker.userData.bone;
+            selBoneIdx = marker.userData.boneIndex;
+            marker.material.color.setHex(0xff3366);
+            document.getElementById('sel-bone-name').textContent = selBone.name || ('Bone ' + selBoneIdx);
+
+            document.querySelectorAll('.bone-item').forEach(el =>
+                el.classList.toggle('sel', parseInt(el.dataset.idx) === selBoneIdx)
+            );
+
+            if (currentMode === 'RIGGING' && !addBoneMode) {
+                txCtrl.attach(selBone);
+            }
+            if (currentMode === 'PAINT') applyWeightViz();
+            updStatus();
+        }
+
+        window.selectFromList = (idx) => {
+            const m = boneMarkers.find(b => b.userData.boneIndex === idx);
+            if (m) selectMarker(m);
+            closeSheet();
+        };
+
+        /* ─── MODE ─────────────────────────────────────────────── */
+        window.setMode = (mode, btn) => {
+            if (brushOn) toggleBrush();
+            if (fillModeOn) toggleFillMode();
+            if (addBoneMode) toggleAddBone();
+
+            currentMode = mode;
+            document.querySelectorAll('.mbtn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            txCtrl.detach();
+            const tbr = document.getElementById('transform-bar');
+            const hint = document.getElementById('paint-hint');
+            const wleg = document.getElementById('wlegend');
+            const fBtn = document.getElementById('floating-brush-btn');
+            const fFillBtn = document.getElementById('floating-fill-btn');
+            const rigTools = document.getElementById('rig-tools');
+
+            tbr.style.display = (mode === 'PAINT') ? 'none' : 'flex';
+            hint.style.display = (mode === 'PAINT') ? 'block' : 'none';
+            wleg.style.display = (mode === 'PAINT') ? 'block' : 'none';
+            fBtn.style.display = (mode === 'PAINT') ? 'flex' : 'none';
+            fFillBtn.style.display = (mode === 'PAINT') ? 'flex' : 'none';
+            rigTools.classList.toggle('show', mode === 'RIGGING');
+
+            if (mode === 'OBJECT') {
+                restoreMats();
+                setBoneViz(false);
+                if (modelGroup.children.length) txCtrl.attach(modelGroup);
+            } else if (mode === 'RIGGING') {
+                restoreMats();
+                setBoneViz(true);
+                if (selBone && !addBoneMode) txCtrl.attach(selBone);
+                else if (!addBoneMode) txCtrl.detach();
+            } else if (mode === 'PAINT') {
+                setBoneViz(true);
+                if (selBone) applyWeightViz();
+            }
+            updStatus();
+        };
+
+        /* ─── ADD BONE MODE ───────────────────────────────────── */
+        window.toggleAddBone = () => {
+            if (currentMode !== 'RIGGING') {
+                setMode('RIGGING', document.querySelectorAll('.mbtn')[1]);
+            }
+            addBoneMode = !addBoneMode;
+            const btn = document.getElementById('btn-add-bone');
+            btn.classList.toggle('active', addBoneMode);
+            if (addBoneMode) {
+                txCtrl.detach();
+                document.getElementById('paint-hint').innerHTML = '✚ انقر على <b>المجسم</b> لإضافة عظمة';
+                document.getElementById('paint-hint').style.display = 'block';
+                document.getElementById('paint-hint').style.top = 'calc(var(--topH) + 44px)';
+            } else {
+                document.getElementById('paint-hint').style.display = 'none';
+                if (selBone) txCtrl.attach(selBone);
+            }
+            updStatus();
+        };
+
+        function createBoneAtPoint(point, mesh) {
+            if (!mesh) return;
+
+            // Find nearest existing bone for parenting
+            let parentBone = null;
+            let minDist = Infinity;
+            const pos = point.clone();
+
+            // Get all bones from the mesh's skeleton or from boneMarkers
+            const allBones = boneMarkers.map(m => m.userData.bone).filter(b => b);
+            for (const b of allBones) {
+                const bp = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
+                const d = pos.distanceTo(bp);
+                if (d < minDist) { minDist = d;
+                    parentBone = b; }
+            }
+
+            // If no bones, create root at point
+            if (!parentBone) {
+                const root = mkBone('Root_' + (userBones.length + 1), pos.x, pos.y, pos.z);
+                // Add to mesh
+                if (mesh.isSkinnedMesh) {
+                    mesh.add(root);
+                } else {
+                    // Fallback: add to modelGroup
+                    modelGroup.add(root);
+                }
+                userBones.push(root);
+                // Rebuild skeleton
+                rebuildSkeletonFromBones(mesh);
+                return;
+            }
+
+            // Create new bone at point, parent to nearest
+            const newBone = mkBone('Bone_' + (userBones.length + 1), pos.x - parentBone.position.x, pos.y - parentBone
+                .position.y, pos.z - parentBone.position.z);
+            // Actually, we need to set position in world space, then parent
+            // But THREE.Bone position is relative to parent
+            // So we need to convert world pos to local pos relative to parent
+            const parentWorldPos = new THREE.Vector3().setFromMatrixPosition(parentBone.matrixWorld);
+            const localPos = pos.clone().sub(parentWorldPos);
+            newBone.position.copy(localPos);
+
+            // Find the mesh to add the bone to
+            let targetMesh = mesh;
+            if (!targetMesh.isSkinnedMesh) {
+                // Find the skinned mesh that contains the parent bone
+                for (const sm of skinnedMeshes) {
+                    if (sm.skeleton && sm.skeleton.bones.includes(parentBone)) {
+                        targetMesh = sm;
+                        break;
+                    }
+                }
+            }
+
+            if (targetMesh && targetMesh.isSkinnedMesh) {
+                parentBone.add(newBone);
+                userBones.push(newBone);
+                rebuildSkeletonFromBones(targetMesh);
+            } else {
+                // Fallback: add to modelGroup
+                parentBone.add(newBone);
+                userBones.push(newBone);
+                // Try to find a mesh to rebuild
+                if (skinnedMeshes.length) {
+                    rebuildSkeletonFromBones(skinnedMeshes[0]);
+                }
+            }
+        }
+
+        function rebuildSkeletonFromBones(mesh) {
+            if (!mesh || !mesh.isSkinnedMesh) return;
+            // Collect all bones in hierarchy
+            const allBones = [];
+            const rootBones = [];
+            const children = mesh.children;
+            for (const c of children) {
+                if (c.isBone) {
+                    rootBones.push(c);
+                    collectBones(c, allBones);
+                }
+            }
+
+            if (!allBones.length) return;
+
+            // Build new skeleton
+            const skel = new THREE.Skeleton(allBones);
+            // Keep the same geometry, re-bind
+            const geo = mesh.geometry.clone();
+            const mat = mesh.material.clone();
+
+            // Remove old mesh
+            const oldName = mesh.name;
+            const oldPos = mesh.position.clone();
+            const oldRot = mesh.quaternion.clone();
+            const oldScale = mesh.scale.clone();
+            const oldParent = mesh.parent;
+
+            mesh.parent.remove(mesh);
+
+            // Create new mesh
+            const newMesh = new THREE.SkinnedMesh(geo, mat);
+            newMesh.name = oldName;
+            newMesh.position.copy(oldPos);
+            newMesh.quaternion.copy(oldRot);
+            newMesh.scale.copy(oldScale);
+            newMesh.castShadow = newMesh.receiveShadow = true;
+
+            // Add bones to new mesh
+            for (const b of rootBones) {
+                newMesh.add(b);
+            }
+
+            // Bind
+            newMesh.bind(skel);
+            newMesh.normalizeSkinWeights();
+
+            // Replace in modelGroup
+            if (oldParent) {
+                oldParent.add(newMesh);
+            } else {
+                modelGroup.add(newMesh);
+            }
+
+            // Update references
+            const idx = skinnedMeshes.indexOf(mesh);
+            if (idx !== -1) skinnedMeshes[idx] = newMesh;
+            else skinnedMeshes.push(newMesh);
+
+            // Update bone markers
+            clearBoneViz();
+            rebuildBoneViz(skel);
+
+            // Re-select bone if it exists
+            if (selBone) {
+                const newMarker = boneMarkers.find(m => m.userData.bone === selBone);
+                if (newMarker) selectMarker(newMarker);
+            }
+
+            refreshBoneList();
+            isRigApplied = true;
+            updStatus();
+        }
+
+        function collectBones(bone, arr) {
+            arr.push(bone);
+            for (const c of bone.children) {
+                if (c.isBone) collectBones(c, arr);
+            }
+        }
+
+        /* ─── DELETE BONE ─────────────────────────────────────── */
+        window.deleteSelectedBone = () => {
+            if (!selBone) { alert('اختر عظمة أولاً'); return; }
+            if (!confirm('حذف العظمة "' + (selBone.name || '') + '"؟')) return;
+
+            const parent = selBone.parent;
+            const children = [...selBone.children];
+
+            // Reparent children to parent
+            for (const c of children) {
+                if (c.isBone) {
+                    if (parent && parent.isBone) {
+                        parent.add(c);
+                    } else {
+                        // Find the mesh root
+                        const mesh = skinnedMeshes.find(m => m.skeleton && m.skeleton.bones.includes(selBone));
+                        if (mesh) mesh.add(c);
+                    }
+                }
+            }
+
+            // Remove bone
+            const mesh = skinnedMeshes.find(m => m.skeleton && m.skeleton.bones.includes(selBone));
+            if (selBone.parent) {
+                selBone.parent.remove(selBone);
+            } else if (mesh) {
+                mesh.remove(selBone);
+            }
+
+            const idx = userBones.indexOf(selBone);
+            if (idx !== -1) userBones.splice(idx, 1);
+
+            selBone = null;
+            selBoneIdx = -1;
+
+            if (mesh) {
+                rebuildSkeletonFromBones(mesh);
+            } else {
+                // Just refresh viz
+                clearBoneViz();
+                if (skinnedMeshes.length && skinnedMeshes[0].skeleton) {
+                    rebuildBoneViz(skinnedMeshes[0].skeleton);
+                }
+                refreshBoneList();
+            }
+
+            document.getElementById('sel-bone-name').textContent = '—';
+            txCtrl.detach();
+            updStatus();
+        };
+
+        /* ─── APPLY RIG ───────────────────────────────────────── */
+        window.applyRig = () => {
+            if (!skinnedMeshes.length) { alert('لا يوجد نموذج لتطبيق العظام عليه'); return; }
+            const mesh = skinnedMeshes[0];
+            if (!mesh.isSkinnedMesh) { alert('النموذج ليس SkinnedMesh'); return; }
+
+            // Check if we have bones
+            const rootBones = [];
+            for (const c of mesh.children) {
+                if (c.isBone) rootBones.push(c);
+            }
+            if (!rootBones.length) {
+                // Try to get bones from userBones
+                if (userBones.length) {
+                    for (const b of userBones) {
+                        if (b.parent === mesh || b.parent === modelGroup) {
+                            rootBones.push(b);
+                        }
+                    }
+                }
+            }
+
+            if (!rootBones.length) { alert('لا توجد عظام لتطبيقها. أضف عظاماً أولاً.'); return; }
+
+            // Collect all bones
+            const allBones = [];
+            for (const b of rootBones) collectBones(b, allBones);
+            if (!allBones.length) { alert('لا توجد عظام'); return; }
+
+            // Build skeleton
+            const skel = new THREE.Skeleton(allBones);
+
+            // Compute default weights (distance-based)
+            const geo = mesh.geometry;
+            const pos = geo.attributes.position;
+            const N = pos.count;
+            const si = new Uint16Array(N * 4);
+            const sw = new Float32Array(N * 4);
+
+            // For each vertex, find the closest bone
+            const bonePositions = allBones.map(b => {
+                const p = new THREE.Vector3().setFromMatrixPosition(b.matrixWorld);
+                return { bone: b, pos: p };
+            });
+
+            for (let i = 0; i < N; i++) {
+                const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+                // Transform vertex to world space
+                v.applyMatrix4(mesh.matrixWorld);
+
+                // Find closest bones
+                const dists = bonePositions.map((bp, idx) => {
+                    const d = v.distanceTo(bp.pos);
+                    return { idx, d };
+                });
+                dists.sort((a, b) => a.d - b.d);
+
+                // Assign weights to top 4 bones
+                const total = dists.slice(0, 4).reduce((sum, d) => sum + (d.d < 0.001 ? 1 : 1 / (d.d + 0.001)), 0);
+                const base = i * 4;
+                for (let j = 0; j < 4; j++) {
+                    if (j < dists.length) {
+                        const d = dists[j];
+                        const w = d.d < 0.001 ? 1 : (1 / (d.d + 0.001)) / total;
+                        si[base + j] = d.idx;
+                        sw[base + j] = w;
+                    } else {
+                        si[base + j] = 0;
+                        sw[base + j] = 0;
+                    }
+                }
+            }
+
+            geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+            geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+
+            // Re-bind mesh
+            const oldName = mesh.name;
+            const oldMat = mesh.material.clone();
+            const newMesh = new THREE.SkinnedMesh(geo, oldMat);
+            newMesh.name = oldName;
+            newMesh.position.copy(mesh.position);
+            newMesh.quaternion.copy(mesh.quaternion);
+            newMesh.scale.copy(mesh.scale);
+            newMesh.castShadow = newMesh.receiveShadow = true;
+
+            // Transfer bones
+            for (const b of rootBones) {
+                newMesh.add(b);
+            }
+
+            mesh.parent.remove(mesh);
+            modelGroup.add(newMesh);
+
+            const idx = skinnedMeshes.indexOf(mesh);
+            if (idx !== -1) skinnedMeshes[idx] = newMesh;
+            else skinnedMeshes.push(newMesh);
+
+            newMesh.bind(skel);
+            newMesh.normalizeSkinWeights();
+
+            clearBoneViz();
+            rebuildBoneViz(skel);
+            refreshBoneList();
+            isRigApplied = true;
+
+            // Select first bone
+            if (boneMarkers.length) {
+                selectMarker(boneMarkers[0]);
+            }
+
+            alert('✓ تم تطبيق العظام والأوزان الافتراضية بنجاح!');
+            updStatus();
+        };
+
+        /* ─── FILL MODE ────────────────────────────────────────── */
+        window.toggleFillMode = () => {
+            if (!selBone) { alert('اختر عظمة أولاً'); return; }
+            if (brushOn) toggleBrush();
+            fillModeOn = !fillModeOn;
+            const btn = document.getElementById('floating-fill-btn');
+            btn.classList.toggle('active', fillModeOn);
+            if (fillModeOn) {
+                orbit.enabled = false;
+                document.getElementById('paint-hint').innerHTML = '<b>🪣 طلاء كلي</b> — انقر على جزء منفصل';
+            } else {
+                cancelFill();
+                orbit.enabled = true;
+                document.getElementById('paint-hint').innerHTML = 'وضع التلوين — اختر <b>عظمة</b> ثم فعّل الفرشاة';
+            }
+            updStatus();
+        };
+
+        function getConnectedVertices(mesh, startIdx) {
+            if (!mesh.userData.adj) {
+                const posArr = mesh.geometry.attributes.position.array;
+                const N = mesh.geometry.attributes.position.count;
+                const idxA = mesh.geometry.index;
+                const indices = idxA ? idxA.array : null;
+                const facesCount = indices ? indices.length / 3 : N / 3;
+                const adj = new Map();
+                const addE = (u, v) => {
+                    if (!adj.has(u)) adj.set(u, []);
+                    if (!adj.has(v)) adj.set(v, []);
+                    adj.get(u).push(v);
+                    adj.get(v).push(u);
+                };
+                for (let i = 0; i < facesCount; i++) {
+                    const v1 = indices ? indices[i * 3] : i * 3;
+                    const v2 = indices ? indices[i * 3 + 1] : i * 3 + 1;
+                    const v3 = indices ? indices[i * 3 + 2] : i * 3 + 2;
+                    addE(v1, v2);
+                    addE(v2, v3);
+                    addE(v3, v1);
+                }
+                const posMap = new Map();
+                const getH = (x, y, z) => `${x.toFixed(3)}_${y.toFixed(3)}_${z.toFixed(3)}`;
+                for (let i = 0; i < N; i++) {
+                    const h = getH(posArr[i * 3], posArr[i * 3 + 1], posArr[i * 3 + 2]);
+                    if (!posMap.has(h)) posMap.set(h, []);
+                    posMap.get(h).push(i);
+                }
+                for (const verts of posMap.values()) {
+                    for (let i = 1; i < verts.length; i++) addE(verts[0], verts[i]);
+                }
+                mesh.userData.adj = adj;
+            }
+            const adj = mesh.userData.adj;
+            const visited = new Set();
+            const q = [startIdx];
+            visited.add(startIdx);
+            let head = 0;
+            while (head < q.length) {
+                const curr = q[head++];
+                const neighbors = adj.get(curr);
+                if (neighbors) {
+                    for (const nxt of neighbors) {
+                        if (!visited.has(nxt)) { visited.add(nxt);
+                            q.push(nxt); }
+                    }
+                }
+            }
+            return Array.from(visited);
+        }
+
+        function highlightSelection(mesh, indices) {
+            const ca = mesh.geometry.attributes.color.array;
+            for (const i of indices) {
+                ca[i * 3] = 1;
+                ca[i * 3 + 1] = 1;
+                ca[i * 3 + 2] = 1;
+            }
+            mesh.geometry.attributes.color.needsUpdate = true;
+        }
+
+        window.cancelFill = () => {
+            if (fillSelection) {
+                refreshVC(fillSelection.mesh, selBoneIdx);
+                fillSelection = null;
+            }
+            document.getElementById('fill-confirm-bar').style.display = 'none';
+        };
+
+        window.applyFillWeight = () => {
+            if (!fillSelection) return;
+            const target = parseFloat(document.getElementById('brush-weight').value);
+            const { mesh, indices } = fillSelection;
+            const si = mesh.geometry.attributes.skinIndex;
+            const sw = mesh.geometry.attributes.skinWeight;
+            for (const i of indices) {
+                blendW(i, si, sw, target, 1.0);
+            }
+            sw.needsUpdate = true;
+            si.needsUpdate = true;
+            refreshVC(mesh, selBoneIdx);
+            cancelFill();
+            toggleFillMode();
+        };
+
+        /* ─── BRUSH TOGGLE ─────────────────────────────────────── */
+        window.toggleBrush = () => {
+            if (fillModeOn) toggleFillMode();
+            if (!brushOn && currentMode !== 'PAINT') {
+                const btn = document.querySelectorAll('.mbtn')[2];
+                setMode('PAINT', btn);
+            }
+            if (!brushOn && !selBone) {
+                alert('اختر عظمة أولاً من قائمة 🦴');
+                return;
+            }
+            brushOn = !brushOn;
+            const btn = document.getElementById('floating-brush-btn');
+            if (brushOn) {
+                btn.classList.add('active');
+                orbit.enabled = false;
+                document.getElementById('brush-cursor').style.display = 'block';
+                updateCursorSize();
+                document.getElementById('paint-hint').innerHTML = '<b>🖌️ الفرشاة تعمل</b> — ارسم على النموذج';
+            } else {
+                btn.classList.remove('active');
+                orbit.enabled = true;
+                document.getElementById('brush-cursor').style.display = 'none';
+                document.getElementById('paint-hint').innerHTML = 'وضع التلوين — اختر <b>عظمة</b> ثم فعّل الفرشاة';
+            }
+            updStatus();
+        };
+
+        /* ─── WEIGHT VIZ ───────────────────────────────────────── */
+        function applyWeightViz() {
+            if (selBoneIdx === -1) return;
+            for (const mesh of skinnedMeshes) {
+                if (!origMats.has(mesh)) origMats.set(mesh, mesh.material);
+                refreshVC(mesh, selBoneIdx);
+                mesh.material = new THREE.MeshBasicMaterial({ vertexColors: true });
+                if (!mesh.userData.wireOverlay) {
+                    const wireMat = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true, transparent: true,
+                        opacity: 0.3, depthWrite: false });
+                    const wireMesh = new THREE.SkinnedMesh(mesh.geometry, wireMat);
+                    wireMesh.bind(mesh.skeleton, mesh.bindMatrix);
+                    mesh.add(wireMesh);
+                    mesh.userData.wireOverlay = wireMesh;
+                }
+                mesh.userData.wireOverlay.visible = true;
+            }
+        }
+
+        function refreshVC(mesh, bIdx) {
+            const geo = mesh.geometry;
+            const si = geo.attributes.skinIndex,
+                sw = geo.attributes.skinWeight;
+            if (!si || !sw) return;
+            const N = si.count;
+            if (!geo.attributes.color || geo.attributes.color.count !== N)
+                geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+            const ca = geo.attributes.color;
+            const siArr = si.array,
+                swArr = sw.array,
+                caArr = ca.array;
+            for (let i = 0; i < N; i++) {
+                let w = 0;
+                const idx = i * 4;
+                if (Math.round(siArr[idx]) === bIdx) w += swArr[idx];
+                if (Math.round(siArr[idx + 1]) === bIdx) w += swArr[idx + 1];
+                if (Math.round(siArr[idx + 2]) === bIdx) w += swArr[idx + 2];
+                if (Math.round(siArr[idx + 3]) === bIdx) w += swArr[idx + 3];
+                const { r, g, b } = heatmap(THREE.MathUtils.clamp(w, 0, 1));
+                const cIdx = i * 3;
+                caArr[cIdx] = r;
+                caArr[cIdx + 1] = g;
+                caArr[cIdx + 2] = b;
+            }
+            ca.needsUpdate = true;
+        }
+
+        function heatmap(t) {
+            let r, g, b;
+            if (t < .25) { r = 0;
+                g = t * 4;
+                b = 1; } else if (t < .5) { r = 0;
+                g = 1;
+                b = 1 - (t - .25) * 4; } else if (t < .75) { r = (t - .5) * 4;
+                g = 1;
+                b = 0; } else { r = 1;
+                g = 1 - (t - .75) * 4;
+                b = 0; }
+            return { r, g, b };
+        }
+
+        function restoreMats() {
+            for (const m of skinnedMeshes) {
+                if (origMats.has(m)) m.material = origMats.get(m);
+                if (m.userData.wireOverlay) m.userData.wireOverlay.visible = false;
+            }
+        }
+
+        /* ─── PAINT ENGINE ─────────────────────────────────────── */
+        function doPaint(cx, cy) {
+            if (!brushOn || currentMode !== 'PAINT' || selBoneIdx === -1) return;
+            setMouseXY(cx, cy);
+            raycaster.setFromCamera(mouse, camera);
+            const hits = raycaster.intersectObjects(skinnedMeshes);
+            if (!hits.length) return;
+            const { object: mesh, point } = hits[0];
+
+            const radiusVal = parseFloat(document.getElementById('brush-radius').value);
+            const wTarget = parseFloat(document.getElementById('brush-weight').value);
+            const strength = parseFloat(document.getElementById('brush-strength').value);
+
+            const cursorRadiusPx = (radiusVal * 60) / 2;
+            const hitDist = camera.position.distanceTo(point);
+            const fovRad = THREE.MathUtils.degToRad(camera.fov);
+            const worldHeight = 2 * hitDist * Math.tan(fovRad / 2);
+            const worldUnitsPerPx = worldHeight / innerHeight;
+            const worldRadius = cursorRadiusPx * worldUnitsPerPx;
+
+            const posA = mesh.geometry.attributes.position;
+            const si = mesh.geometry.attributes.skinIndex;
+            const sw = mesh.geometry.attributes.skinWeight;
+            if (!posA || !si || !sw) return;
+
+            const meshScale = new THREE.Vector3().setFromMatrixScale(mesh.matrixWorld);
+            const maxScale = Math.max(meshScale.x, meshScale.y, meshScale.z);
+            const localRadius = worldRadius / maxScale;
+            const localRadiusSq = localRadius * localRadius;
+
+            const localPoint = mesh.worldToLocal(point.clone());
+            const px = localPoint.x,
+                py = localPoint.y,
+                pz = localPoint.z;
+            const posArr = posA.array;
+
+            let dirty = false;
+            for (let i = 0; i < posA.count; i++) {
+                const idx = i * 3;
+                const dx = posArr[idx] - px,
+                    dy = posArr[idx + 1] - py,
+                    dz = posArr[idx + 2] - pz;
+                const distSq = dx * dx + dy * dy + dz * dz;
+                if (distSq >= localRadiusSq) continue;
+                const d = Math.sqrt(distSq) * maxScale;
+                const falloff = (1 - (d / worldRadius));
+                const finalStrength = THREE.MathUtils.clamp(falloff * strength, 0, 1);
+                blendW(i, si, sw, wTarget, finalStrength);
+                dirty = true;
+            }
+            if (dirty) { sw.needsUpdate = true;
+                si.needsUpdate = true;
+                refreshVC(mesh, selBoneIdx); }
+        }
+
+        function blendW(vi, si, sw, target, strength) {
+            let slot = -1,
+                minW = Infinity,
+                minSlot = 0;
+            for (let j = 0; j < 4; j++) {
+                if (Math.round(si.getComponent(vi, j)) === selBoneIdx) { slot = j; break; }
+                const w = sw.getComponent(vi, j);
+                if (w < minW) { minW = w;
+                    minSlot = j; }
+            }
+            if (slot === -1) { slot = minSlot;
+                si.setComponent(vi, slot, selBoneIdx); }
+            const cur = sw.getComponent(vi, slot);
+            sw.setComponent(vi, slot, THREE.MathUtils.lerp(cur, target, strength));
+            let sum = 0;
+            for (let j = 0; j < 4; j++) sum += sw.getComponent(vi, j);
+            if (sum > 1e-4)
+                for (let j = 0; j < 4; j++) sw.setComponent(vi, j, sw.getComponent(vi, j) / sum);
+            else sw.setComponent(vi, slot, 1.0);
+        }
+
+        /* ─── POINTER EVENTS ───────────────────────────────────── */
+        function onPtrDown(e) {
+            if (txCtrl.dragging || txCtrl.axis !== null) return;
+
+            // In rigging mode with add bone active
+            if (currentMode === 'RIGGING' && addBoneMode) {
+                setMouseXY(e.clientX, e.clientY);
+                raycaster.setFromCamera(mouse, camera);
+                const hits = raycaster.intersectObjects(skinnedMeshes);
+                if (hits.length) {
+                    const pt = hits[0].point;
+                    const mesh = hits[0].object;
+                    createBoneAtPoint(pt, mesh);
+                    // Select the newly created bone (last one)
+                    if (boneMarkers.length) {
+                        selectMarker(boneMarkers[boneMarkers.length - 1]);
+                    }
+                    // Keep add bone mode active
+                    return;
+                }
+                return;
+            }
+
+            // Try to select a bone first (in rigging or paint mode)
+            if (currentMode === 'RIGGING' || currentMode === 'PAINT') {
+                if (selectBoneAtPointer(e.clientX, e.clientY)) {
+                    if (currentMode === 'RIGGING' && !addBoneMode) {
+                        txCtrl.attach(selBone);
+                    }
+                    return;
+                }
+            }
+
+            // Transform controls
+            if (currentMode === 'RIGGING' && !addBoneMode && selBone) {
+                // Bone already selected, let transform controls handle it
+                return;
+            }
+
+            // Fill mode
+            if (currentMode === 'PAINT' && fillModeOn) {
+                if (fillSelection) return;
+                setMouseXY(e.clientX, e.clientY);
+                raycaster.setFromCamera(mouse, camera);
+                const hits = raycaster.intersectObjects(skinnedMeshes);
+                if (hits.length) {
+                    const hit = hits[0];
+                    const startIdx = hit.face ? hit.face.a : null;
+                    if (startIdx !== null) {
+                        const mesh = hit.object;
+                        const connected = getConnectedVertices(mesh, startIdx);
+                        fillSelection = { mesh, indices: connected };
+                        highlightSelection(mesh, connected);
+                        document.getElementById('fill-confirm-bar').style.display = 'flex';
+                    }
+                }
+                return;
+            }
+
+            // Paint mode with brush
+            if (currentMode === 'PAINT' && brushOn) {
+                isPainting = true;
+                doPaint(e.clientX, e.clientY);
+                return;
+            }
+
+            // Object mode: select objects?
+            if (currentMode === 'OBJECT') {
+                // Just let orbit controls handle it
+            }
+        }
+
+        function onPtrMove(e) {
+            if (brushOn && currentMode === 'PAINT') {
+                const cur = document.getElementById('brush-cursor');
+                cur.style.left = e.clientX + 'px';
+                cur.style.top = e.clientY + 'px';
+            }
+            if (!isPainting) return;
+            doPaint(e.clientX, e.clientY);
+        }
+
+        function onPtrUp() { isPainting = false; }
+
+        function setMouseXY(cx, cy) {
+            const r = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((cx - r.left) / r.width) * 2 - 1;
+            mouse.y = -((cy - r.top) / r.height) * 2 + 1;
+        }
+
+        /* ─── CURSOR SIZE ──────────────────────────────────────── */
+        window.updateCursorSize = () => {
+            const radiusVal = parseFloat(document.getElementById('brush-radius').value);
+            const px = radiusVal * 60;
+            const cur = document.getElementById('brush-cursor');
+            cur.style.width = px + 'px';
+            cur.style.height = px + 'px';
+        };
+
+        /* ─── KEYBOARD ─────────────────────────────────────────── */
+        function onKeyDown(e) {
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            switch (e.key.toLowerCase()) {
+                case 'g':
+                    setTransform('translate');
+                    break;
+                case 'r':
+                    setTransform('rotate');
+                    break;
+                case 's':
+                    setTransform('scale');
+                    break;
+                case 'w':
+                    toggleWireframe();
+                    break;
+                case 'tab':
+                    e.preventDefault();
+                    const ms = ['OBJECT', 'RIGGING', 'PAINT'];
+                    const ni = (ms.indexOf(currentMode) + 1) % 3;
+                    setMode(ms[ni], document.querySelectorAll('.mbtn')[ni]);
+                    break;
+                case 'delete':
+                case 'backspace':
+                    if (currentMode === 'RIGGING' && selBone) deleteSelectedBone();
+                    break;
+            }
+        }
+
+        /* ─── UI ───────────────────────────────────────────────── */
+        window.setTransform = (mode) => {
+            if (currentMode === 'PAINT') return;
+            txCtrl.setMode(mode);
+            document.querySelectorAll('.tl-btn[id^="t-"]').forEach(b => b.classList.remove('active'));
+            const el = document.getElementById('t-' + mode);
+            if (el) el.classList.add('active');
+        };
+
+        window.resetCamera = () => {
+            camera.position.set(0, 4, 10);
+            orbit.target.set(0, 2.5, 0);
+            orbit.update();
+        };
+
+        window.toggleWireframe = () => {
+            wireframe = !wireframe;
+            document.getElementById('t-wire').classList.toggle('active', wireframe);
+            for (const m of skinnedMeshes) {
+                const mat = origMats.has(m) ? origMats.get(m) : m.material;
+                if (mat && 'wireframe' in mat) mat.wireframe = wireframe;
+            }
+        };
+
+        window.resetBoneWeights = () => {
+            if (!selBone) { alert('اختر عظمة أولاً'); return; }
+            if (!confirm('إعادة ضبط أوزان "' + (selBone.name || '') + '"؟')) return;
+            for (const mesh of skinnedMeshes) {
+                const si = mesh.geometry.attributes.skinIndex;
+                const sw = mesh.geometry.attributes.skinWeight;
+                if (!si || !sw) continue;
+                for (let i = 0; i < sw.count; i++)
+                    for (let j = 0; j < 4; j++)
+                        if (Math.round(si.getComponent(i, j)) === selBoneIdx) sw.setComponent(i, j, 0);
+                sw.needsUpdate = true;
+                refreshVC(mesh, selBoneIdx);
+            }
+        };
+
+        window.applyPaint = () => {
+            if (brushOn) toggleBrush();
+            if (fillModeOn) toggleFillMode();
+            restoreMats();
+            setMode('OBJECT', document.querySelectorAll('.mbtn')[0]);
+            closeSheet();
+        };
+
+        /* ─── SHEETS ───────────────────────────────────────────── */
+        window.openSheet = (id) => {
+            document.querySelectorAll('.bsheet').forEach(s => s.classList.remove('open'));
+            document.getElementById('modal-brush').classList.remove('open');
+            const el = document.getElementById('sheet-' + id);
+            if (!el) return;
+            el.classList.add('open');
+            const ov = document.getElementById('sheet-overlay');
+            ov.style.display = 'block';
+            requestAnimationFrame(() => ov.classList.add('vis'));
+        };
+
+        window.openBrushModal = () => {
+            document.querySelectorAll('.bsheet').forEach(s => s.classList.remove('open'));
+            const el = document.getElementById('modal-brush');
+            el.classList.add('open');
+            const ov = document.getElementById('sheet-overlay');
+            ov.style.display = 'block';
+            requestAnimationFrame(() => ov.classList.add('vis'));
+        };
+
+        window.closeSheet = () => {
+            document.querySelectorAll('.bsheet').forEach(s => s.classList.remove('open'));
+            document.getElementById('modal-brush').classList.remove('open');
+            const ov = document.getElementById('sheet-overlay');
+            ov.classList.remove('vis');
+            setTimeout(() => ov.style.display = 'none', 260);
+        };
+
+        /* ─── STATUS & BONE LIST ───────────────────────────────── */
+        function updStatus() {
+            const bTxt = selBone ? selBone.name : 'لا توجد عظمة';
+            let extra = '';
+            if (brushOn) extra = ' · 🖌️';
+            if (fillModeOn) extra = ' · 🪣';
+            if (addBoneMode) extra = ' · ✚';
+            document.getElementById('status-txt').textContent = currentMode + ' · ' + bTxt + extra;
+        }
+
+        function refreshBoneList() {
+            const el = document.getElementById('bone-list');
+            if (!boneMarkers.length) {
+                el.innerHTML = '<div style="font-size:12px;color:var(--dim)">لا توجد عظام</div>';
+                return;
+            }
+            el.innerHTML = boneMarkers.map(m =>
+                `<div class="bone-item" data-idx="${m.userData.boneIndex}"
+                     onclick="selectFromList(${m.userData.boneIndex})">
+                    <div class="bdot" style="background:#${m.userData.baseColor.toString(16).padStart(6,'0')}"></div>
+                    <span>${m.userData.bone.name || 'Bone ' + m.userData.boneIndex}</span>
+                </div>`
+            ).join('');
+        }
+
+        /* ─── FILE IMPORT ──────────────────────────────────────── */
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            const ext = file.name.split('.').pop().toLowerCase();
+
+            if (!['obj', 'fbx', 'gltf', 'glb'].includes(ext)) {
+                alert('صيغة غير مدعومة: .' + ext + '\nالصيغ المدعومة: OBJ · FBX · GLTF · GLB');
+                e.target.value = '';
+                return;
+            }
+
+            showLoad('جاري تحميل ' + file.name);
+            modelGroup.clear();
+            skinnedMeshes = [];
+            origMats.clear();
+            clearBoneViz();
+            txCtrl.detach();
+            selBone = null;
+            selBoneIdx = -1;
+            brushOn = false;
+            fillModeOn = false;
+            addBoneMode = false;
+            cancelFill();
+            userBones = [];
+            isRigApplied = false;
+            document.getElementById('btn-add-bone').classList.remove('active');
+            document.getElementById('rig-tools').classList.remove('show');
+
+            const finish = (obj) => {
+                try {
+                    const box = new THREE.Box3().setFromObject(obj);
+                    const size = box.getSize(new THREE.Vector3());
+                    const ctr = box.getCenter(new THREE.Vector3());
+                    const sc = 5 / Math.max(size.x, size.y, size.z, 0.01);
+                    obj.scale.setScalar(sc);
+                    obj.position.sub(ctr.multiplyScalar(sc));
+
+                    const basicMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.6, metalness: 0.1 });
+                    obj.traverse(c => {
+                        if (c.isMesh) {
+                            c.material = basicMat;
+                            if (c.isSkinnedMesh) skinnedMeshes.push(c);
+                        }
+                    });
+
+                    modelGroup.add(obj);
+
+                    // Auto-rig if no skinned mesh
+                    if (!skinnedMeshes.length) {
+                        const plain = [];
+                        obj.traverse(c => { if (c.isMesh) plain.push(c); });
+                        for (const p of plain) autoRig(p);
+                    }
+
+                    const seen = new Set();
+                    for (const m of skinnedMeshes) {
+                        if (m.skeleton && !seen.has(m.skeleton)) {
+                            seen.add(m.skeleton);
+                            rebuildBoneViz(m.skeleton);
+                            isRigApplied = true;
+                        }
+                    }
+
+                    // If we have bones, mark as rig applied
+                    if (boneMarkers.length) isRigApplied = true;
+
+                    refreshBoneList();
+                    setMode('OBJECT', document.querySelectorAll('.mbtn')[0]);
+                    txCtrl.attach(modelGroup);
+                } catch (err) {
+                    console.error(err);
+                    alert('خطأ في معالجة النموذج: ' + (err.message || err));
+                } finally {
+                    hideLoad();
+                    e.target.value = '';
+                    URL.revokeObjectURL(url);
+                }
+            };
+
+            const fail = (err) => {
+                hideLoad();
+                e.target.value = '';
+                URL.revokeObjectURL(url);
+                alert('فشل تحميل الملف.\n' + (err.message || err));
+            };
+
+            if (ext === 'gltf' || ext === 'glb') {
+                new GLTFLoader().load(url, r => finish(r.scene), undefined, fail);
+            } else if (ext === 'fbx') {
+                new FBXLoader().load(url, r => finish(r), undefined, fail);
+            } else if (ext === 'obj') {
+                new OBJLoader().load(url, r => finish(r), undefined, fail);
+            }
+        }
+
+        function autoRig(mesh) {
+            const geo = mesh.geometry;
+            if (!geo?.attributes?.position) return;
+            const pos = geo.attributes.position,
+                N = pos.count;
+            let minY = Infinity,
+                maxY = -Infinity;
+            for (let i = 0; i < N; i++) { const y = pos.getY(i);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y); }
+            const h = maxY - minY || 1;
+            const bA = mkBone('Root', 0, minY, 0),
+                bB = mkBone('Mid', 0, h * .5, 0),
+                bC = mkBone('Top', 0, h * .5, 0);
+            bA.add(bB);
+            bB.add(bC);
+            const skel = new THREE.Skeleton([bA, bB, bC]);
+            const si = new Uint16Array(N * 4),
+                sw = new Float32Array(N * 4);
+            for (let i = 0; i < N; i++) {
+                const t = THREE.MathUtils.clamp((pos.getY(i) - minY) / h, 0, 1);
+                const b = i * 4;
+                let b0, b1, frac;
+                if (t < .5) { b0 = 0;
+                    b1 = 1;
+                    frac = smoothstep(t * 2); } else { b0 = 1;
+                    b1 = 2;
+                    frac = smoothstep((t - .5) * 2); }
+                si[b] = b0;
+                sw[b] = 1 - frac;
+                si[b + 1] = b1;
+                sw[b + 1] = frac;
+            }
+            geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+            geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+            const sm = new THREE.SkinnedMesh(geo, mesh.material);
+            sm.name = (mesh.name || 'Mesh') + '_Rig';
+            sm.add(bA);
+            sm.bind(skel);
+            sm.normalizeSkinWeights();
+            modelGroup.add(sm);
+            skinnedMeshes.push(sm);
+            isRigApplied = true;
+        }
+
+        /* ─── EXPORT ───────────────────────────────────────────── */
+        window.exportModel = () => {
+            if (!modelGroup.children.length) { alert('لا يوجد نموذج!'); return; }
+            restoreMats();
+            modelGroup.traverse(node => { if (node.isSkinnedMesh) node.skeleton.update(); });
+
+            const exporter = new GLTFExporter();
+            exporter.parse(modelGroup, gltf => {
+                const output = JSON.stringify(gltf, null, 2);
+                const blob = new Blob([output], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'rigged_model.gltf';
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }, err => { alert('خطأ في التصدير: ' + err.message); }, { trs: true, onlyVisible: false, binary: false });
+        };
+
+        /* ─── LOOP ─────────────────────────────────────────────── */
+        function animate() {
+            requestAnimationFrame(animate);
+            if (currentMode !== 'OBJECT') {
+                updateBoneMarkers();
+            }
+            orbit.update();
+            renderer.render(scene, camera);
+        }
+
+        function onResize() {
+            camera.aspect = innerWidth / innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(innerWidth, innerHeight);
+        }
+
+        function showLoad(t) {
+            document.getElementById('load-txt').textContent = t;
+            document.getElementById('loading').style.display = 'flex';
+        }
+
+        function hideLoad() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        /* ─── EXPOSE GLOBALS ───────────────────────────────────── */
+        window.THREE = THREE;
+        window.scene = scene;
+        window.camera = camera;
+        window.modelGroup = modelGroup;
+        window.skinnedMeshes = skinnedMeshes;
+        window.boneMarkers = boneMarkers;
+        window.selBone = selBone;
+        window.selBoneIdx = selBoneIdx;
+        window.currentMode = currentMode;
+        window.selectBoneAtPointer = selectBoneAtPointer;
+        window.createBoneAtPoint = createBoneAtPoint;
+        window.rebuildSkeletonFromBones = rebuildSkeletonFromBones;
+        window.collectBones = collectBones;
+        window.userBones = userBones;
+        window.isRigApplied = isRigApplied;
+
+        console.log('🎯 3D Rig & Paint Studio loaded.');
+        console.log('📐 Landscape optimized · Bone creation · Enhanced selection');
+    </script>
+</body>
+</html>
